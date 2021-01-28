@@ -1,0 +1,39 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: backup-job
+  namespace: default
+spec:
+  schedule: "34 0 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 200
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup-job
+            image: geekgonecrazy/deepfreeze
+            env:
+            - name: RC_WEBHOOK
+              value: https://{RC_WEBHOOK value}
+            - name: CONNECTION_URL
+              value: mongodb://mongo:27017/{DatabaseName}?replicaSet=rs01
+            - name: DATABASES
+              value: product1
+            - name: BACKUP_KEYS
+              value: age230sdfa32lkj2dfh02c82308h3082h3acashbzjklakjsdf02380as8hdfa
+            - name: S3_ENDPOINT
+              value: s3.us-west-000.backblazeb2.com
+            - name: S3_BUCKET
+              value: my-encrypted-backups
+            - name: S3_ACCESS_ID
+              value: "000000000300000"
+            - name: S3_ACCESS_KEY
+              value: asdkajsf0382h082h38f0hf
+            - name: S3_REGION
+              value: us-west-000
+
+          restartPolicy: OnFailure
