@@ -73,7 +73,7 @@ func backupDatabase(connectionString string, database string) (string, string, i
 		return "", "", 0, err
 	}
 
-	backupDirectory := "backups/"
+	backupDirectory := "backups"
 
 	if _, err := os.Stat(backupDirectory); os.IsNotExist(err) {
 		if err := os.MkdirAll(backupDirectory, 0777); err != nil {
