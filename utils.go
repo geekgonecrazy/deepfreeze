@@ -78,6 +78,9 @@ func triggerWebhook(url string, payload interface{}) {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	req.Header.Add("Content-Type", "application/json")
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
