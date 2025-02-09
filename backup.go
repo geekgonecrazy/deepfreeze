@@ -66,13 +66,6 @@ func backupDatabase(connectionString string, database string) (string, string, i
 
 	fileName := fmt.Sprintf("%s-%s.gz.age", database, backupTime.Format("01-02-06-15.04.05"))
 
-	log.Println("Getting presigned upload url")
-
-	uploadURL, err := getS3UploadURL(fmt.Sprintf("%s/%s", S3Folder, fileName), 2*time.Hour)
-	if err != nil {
-		return "", "", 0, err
-	}
-
 	backupDirectory := "backups"
 
 	if _, err := os.Stat(backupDirectory); os.IsNotExist(err) {
@@ -119,7 +112,7 @@ func backupDatabase(connectionString string, database string) (string, string, i
 
 	log.Println(fmt.Sprintf("Uploading backup %s", filePath))
 
-	if _, err := runCommand(fmt.Sprintf("curl --upload-file %s \"%s\"", filePath, uploadURL), 60, false); err != nil {
+	if err := uploadFile(filePath, fmt.Sprintf("%s/%s", S3Folder, fileName)); err != nil {
 		return "", "", 0, err
 	}
 
