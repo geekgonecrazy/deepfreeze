@@ -21,18 +21,25 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func getS3UploadURL(path string, expire time.Duration) (string, error) {
+func uploadFile(filePath, objectPath string) error {
 	minioClient, err := minio.NewWithRegion(S3Endpoint, S3AccessID, S3AccessKey, true, S3Region)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	url, err := minioClient.PresignedPutObject(S3Bucket, path, expire)
+	_, err = minioClient.FPutObject(
+		S3Bucket,
+		objectPath,
+		filePath,
+		minio.PutObjectOptions{},
+	)
+
 	if err != nil {
-		return "", err
+		fmt.Println(err)
+		return err
 	}
 
-	return url.String(), nil
+	return nil
 }
 
 func bytesToMegaBytes(b int64) float64 {
