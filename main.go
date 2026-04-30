@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 var (
@@ -20,30 +23,47 @@ var (
 )
 
 func main() {
-	backupKeys := os.Getenv("BACKUP_KEYS")
+	cmd, sub := parseSubcommand(os.Args[1:])
 
-	if backupKeys == "" {
-		panic("BACKUP_KEYS required. Security first peeps")
+	switch cmd {
+	case "freeze":
+		loadCommonConfig()
+		loadFreezeConfig()
+		mode := sub
+		if mode == "" {
+			mode = "full"
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 70*time.Minute)
+		defer cancel()
+		if err := Freeze(ctx, mode); err != nil {
+			log.Fatal("Freeze failed: ", err)
+		}
+	case "thaw":
+		loadCommonConfig()
+		loadFreezeConfig() // thaw still needs DATABASES + ConnectionURL fallback
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Hour)
+		defer cancel()
+		if err := Thaw(ctx); err != nil {
+			log.Fatal("Thaw failed: ", err)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "usage: deepfreeze [freeze [full|incremental] | thaw]\n")
+		os.Exit(2)
 	}
+}
 
-	BackupKeys = strings.Split(backupKeys, ",")
-
-	connectionURL := os.Getenv("CONNECTION_URL")
-
-	if connectionURL == "" {
-		panic("CONNECTION_URL required.  This is how we find the database")
+func parseSubcommand(args []string) (cmd, sub string) {
+	if len(args) == 0 {
+		return "freeze", "full"
 	}
-
-	ConnectionURL = connectionURL
-
-	databases := os.Getenv("DATABASES")
-
-	if databases == "" {
-		panic("DATABASES is not defined.  Need a list of databases to backup")
+	cmd = args[0]
+	if len(args) > 1 {
+		sub = args[1]
 	}
+	return cmd, sub
+}
 
-	Databases = strings.Split(databases, ",")
-
+func loadCommonConfig() {
 	s3endpoint := os.Getenv("S3_ENDPOINT")
 	s3bucket := os.Getenv("S3_BUCKET")
 	s3accessID := os.Getenv("S3_ACCESS_ID")
@@ -60,16 +80,29 @@ func main() {
 	S3Region = s3region
 	S3Endpoint = s3endpoint
 
-	s3folder := os.Getenv("S3_FOLDER")
-
-	if s3folder != "" {
+	if s3folder := os.Getenv("S3_FOLDER"); s3folder != "" {
 		S3Folder = s3folder
 	}
 
-	webhookurl := os.Getenv("RC_WEBHOOK")
-	WebhookURL = webhookurl
+	WebhookURL = os.Getenv("RC_WEBHOOK")
+}
 
-	if err := Backup(); err != nil {
-		log.Fatal("An error occured", err)
+func loadFreezeConfig() {
+	backupKeys := os.Getenv("BACKUP_KEYS")
+	if backupKeys == "" {
+		panic("BACKUP_KEYS required. Security first peeps")
 	}
+	BackupKeys = strings.Split(backupKeys, ",")
+
+	connectionURL := os.Getenv("CONNECTION_URL")
+	if connectionURL == "" {
+		panic("CONNECTION_URL required.  This is how we find the database")
+	}
+	ConnectionURL = connectionURL
+
+	databases := os.Getenv("DATABASES")
+	if databases == "" {
+		panic("DATABASES is not defined.  Need a list of databases to backup")
+	}
+	Databases = strings.Split(databases, ",")
 }
