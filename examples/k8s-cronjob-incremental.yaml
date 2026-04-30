@@ -1,22 +1,23 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: backup-full
+  name: backup-incremental
   namespace: default
 spec:
-  schedule: "34 0 * * *"
+  schedule: "0 * * * *"
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 200
   successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      backoffLimit: 3
       template:
         spec:
           containers:
-          - name: backup-full
+          - name: backup-incremental
             image: geekgonecrazy/deepfreeze
-            command: ["/root/app", "freeze", "full"]
+            command: ["/root/app", "freeze", "incremental"]
             env:
             - name: RC_WEBHOOK
               value: https://{RC_WEBHOOK value}
