@@ -38,6 +38,8 @@ If `log length` is shorter than your full→full interval, resize the oplog or r
 
 ## How do I use it?
 
+CI publishes multi-arch (`amd64`/`arm64`) images to Docker Hub: every push to `main` updates [`geekgonecrazy/deepfreeze:latest`](https://hub.docker.com/r/geekgonecrazy/deepfreeze), and pushing a `v*` tag publishes `geekgonecrazy/deepfreeze:<semver>` tags.
+
 If you aren't using the docker image you will need `mongodump`, `mongorestore`, and `age` installed.
 
 You'll need an age key pair (`age-keygen`). Keep the private one safe; the public one(s) go in `BACKUP_KEYS`. The private one is needed only for `thaw` (`BACKUP_IDENTITY`).
