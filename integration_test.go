@@ -52,7 +52,7 @@ type testEnv struct {
 // the production globals as main() would, and returns a struct with handles
 // to the seeded test data. All container/lifecycle cleanup is registered via
 // t.Cleanup.
-func setupTest(ctx context.Context, t *testing.T) *testEnv {
+func setupTest(ctx context.Context, t *testing.T, mongoImage string) *testEnv {
 	t.Helper()
 
 	const (
@@ -64,7 +64,7 @@ func setupTest(ctx context.Context, t *testing.T) *testEnv {
 	)
 
 	s3Endpoint := startSeaweedFS(ctx, t)
-	mongoURI := startMongoReplicaSet(ctx, t)
+	mongoURI := startMongoReplicaSet(ctx, t, mongoImage)
 
 	identity, err := age.GenerateX25519Identity()
 	if err != nil {
@@ -104,18 +104,30 @@ func setupTest(ctx context.Context, t *testing.T) *testEnv {
 
 // TestFreezeIncrementalThaw exercises the full chain end-to-end: full →
 // mutate → incremental → drop → thaw, asserting both the pre-full and the
-// post-full-pre-incremental documents are present.
+// post-full-pre-incremental documents are present. The whole chain runs
+// against every server version in mongoVersions (4.4 and 8.0), since the
+// app and the shipped Database Tools must handle both.
 //
 // Run with: go test -tags=integration ./...
 //
 // Requires on the host: docker, mongodump, mongorestore, age.
 func TestFreezeIncrementalThaw(t *testing.T) {
+	for _, mongoImage := range mongoVersions {
+		mongoImage := mongoImage
+		t.Run(mongoImage, func(t *testing.T) {
+			runFreezeIncrementalThaw(t, mongoImage)
+		})
+	}
+}
+
+func runFreezeIncrementalThaw(t *testing.T, mongoImage string) {
+	t.Helper()
 	skipIfHostMissing(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	env := setupTest(ctx, t)
+	env := setupTest(ctx, t, mongoImage)
 
 	if _, err := env.coll.InsertOne(ctx, bson.M{"name": "pre-full"}); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -167,12 +179,22 @@ func TestFreezeIncrementalThaw(t *testing.T) {
 // We don't need to actually wait for an oplog to roll; the comparison logic
 // is independent of how the gap was created.
 func TestIncrementalDetectsBrokenChain(t *testing.T) {
+	for _, mongoImage := range mongoVersions {
+		mongoImage := mongoImage
+		t.Run(mongoImage, func(t *testing.T) {
+			runIncrementalDetectsBrokenChain(t, mongoImage)
+		})
+	}
+}
+
+func runIncrementalDetectsBrokenChain(t *testing.T, mongoImage string) {
+	t.Helper()
 	skipIfHostMissing(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	env := setupTest(ctx, t)
+	env := setupTest(ctx, t, mongoImage)
 
 	if _, err := env.coll.InsertOne(ctx, bson.M{"name": "before-tamper"}); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -290,11 +312,16 @@ func startSeaweedFS(ctx context.Context, t *testing.T) string {
 	return fmt.Sprintf("%s:%s", host, port.Port())
 }
 
-func startMongoReplicaSet(ctx context.Context, t *testing.T) string {
+// mongoVersions is the set of server versions each integration test runs
+// against, mirroring the fleet deepfreeze protects: 4.4 is the oldest
+// release supported by the Go driver v2, 8.0 is the current major.
+var mongoVersions = []string{"mongo:4.4", "mongo:8.0"}
+
+func startMongoReplicaSet(ctx context.Context, t *testing.T, image string) string {
 	t.Helper()
-	ctr, err := tcmongo.Run(ctx, "mongo:6", tcmongo.WithReplicaSet("rs0"))
+	ctr, err := tcmongo.Run(ctx, image, tcmongo.WithReplicaSet("rs0"))
 	if err != nil {
-		t.Fatalf("start mongo: %v", err)
+		t.Fatalf("start mongo (%s): %v", image, err)
 	}
 	t.Cleanup(func() { _ = ctr.Terminate(context.Background()) })
 	uri, err := ctr.ConnectionString(ctx)

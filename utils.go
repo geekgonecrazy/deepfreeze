@@ -103,6 +103,46 @@ func bytesToMegaBytes(b int64) float64 {
 	return output
 }
 
+// uriWithoutDatabase strips the database path component from a MongoDB
+// connection string. Used where a command-line tool call passes --db along
+// with the URI: modern Database Tools error out ("Cannot specify different
+// database in connection URI and command-line option") if the URI also names
+// a database. Authentication defaults to the database in the URI path, so the
+// stripped database is re-added as an explicit authSource unless one is
+// already present.
+func uriWithoutDatabase(uri string) string {
+	schemeEnd := strings.Index(uri, "://")
+	if schemeEnd < 0 {
+		return uri
+	}
+	rest := uri[schemeEnd+3:] // user:pass@hosts/database?query
+	slash := strings.IndexByte(rest, '/')
+	if slash < 0 {
+		return uri
+	}
+	afterSlash := rest[slash+1:]
+	sep := strings.IndexByte(afterSlash, '?')
+	db, query := afterSlash, ""
+	if sep >= 0 {
+		db, query = afterSlash[:sep], afterSlash[sep+1:]
+	}
+	if db == "" {
+		return uri
+	}
+	out := uri[:schemeEnd+3+slash]
+	switch {
+	case strings.Contains(query, "authSource="):
+		if query != "" {
+			out += "?" + query
+		}
+	case query == "":
+		out += "?authSource=" + db
+	default:
+		out += "?" + query + "&authSource=" + db
+	}
+	return out
+}
+
 func runCommand(command string, timeout int, bash bool) (string, error) {
 	log.Println("COMMAND", command)
 

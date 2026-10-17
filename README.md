@@ -134,6 +134,8 @@ It requires Docker plus `mongodump`, `mongorestore`, and `age` on the host (the 
 brew install age mongodb/brew/mongodb-database-tools
 ```
 
+Each integration test runs its full chain against both `mongo:4.4` and `mongo:8.0` replica sets (the CI image ships Database Tools 100.14.1, which officially supports 8.x and stays wire-compatible with 4.4).
+
 A plain `go test ./...` (no tag) skips the integration test entirely so contributors without Docker aren't blocked.
 
 ## FAQ

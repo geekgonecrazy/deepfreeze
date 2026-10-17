@@ -209,8 +209,10 @@ func runIncrementalBackup(ctx context.Context) error {
 
 	dumpDir := filepath.Join(tmpDir, "dump")
 	queryJSON := fmt.Sprintf(`{"ts":{"$gt":{"$timestamp":{"t":%d,"i":%d}}}}`, fromTs.T, fromTs.I)
+	// The oplog dump targets local.oplog.rs via --db; modern Database Tools
+	// reject a mongodump call where the URI names a conflicting database.
 	dumpCmd := fmt.Sprintf("mongodump --uri='%s' --db=local --collection=oplog.rs --query='%s' --out=%s",
-		cs, queryJSON, dumpDir)
+		uriWithoutDatabase(cs), queryJSON, dumpDir)
 	if _, err := runCommand(dumpCmd, 60, false); err != nil {
 		return fmt.Errorf("mongodump oplog: %w", err)
 	}
