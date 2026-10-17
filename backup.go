@@ -89,9 +89,11 @@ func runFullBackup(ctx context.Context, database string) error {
 
 	cs := strings.Replace(ConnectionURL, "{DatabaseName}", database, -1)
 
-	// Capture the oplog head ts BEFORE the dump starts. Any writes during the
-	// dump are inside mongodump --oplog's archive AND will reappear in the
-	// next incremental — replays are idempotent so the overlap is harmless.
+	// Capture the oplog head ts BEFORE the dump starts. Writes during the
+	// dump window reappear in the following incrementals; mongorestore
+	// tolerates replays that overlap data already in the dump, so recovery
+	// chains fulls (data only — see the dump command below) with oplog
+	// replay starting at this ts.
 	oplogStartTs, err := readOplogHead(ctx, cs)
 	if err != nil {
 		return fmt.Errorf("read oplog head: %w", err)
@@ -116,10 +118,17 @@ func runFullBackup(ctx context.Context, database string) error {
 	filePath := filepath.Join(tmpDir, fmt.Sprintf("%s-%s.gz.age", database, timestamp))
 
 	encryptionCommand := fmt.Sprintf("age -r %s", strings.Join(BackupKeys, " -r "))
-	dumpCommand := fmt.Sprintf("mongodump --uri='%s' --archive --gzip --oplog | %s > %s", cs, encryptionCommand, filePath)
+	// Modern Database Tools only accept --oplog on whole-instance dumps, so
+	// the per-database full contains data only. Recovery of the dump window
+	// rides on oplogStartTs (captured before the dump): the following
+	// incrementals replay from there, and mongorestore tolerates replays
+	// that overlap data already in the dump.
+	dumpCommand := fmt.Sprintf("mongodump --uri='%s' --archive --gzip | %s > %s", cs, encryptionCommand, filePath)
 
 	log.Println("Performing Database Backup")
-	if _, err := runCommand(dumpCommand, 60, false); err != nil {
+	// bash + pipefail so a mongodump or age failure fails the pipeline
+	// instead of silently producing an empty archive.
+	if _, err := runCommand("set -o pipefail; "+dumpCommand, 60, true); err != nil {
 		return fmt.Errorf("mongodump: %w", err)
 	}
 
@@ -228,7 +237,7 @@ func runIncrementalBackup(ctx context.Context) error {
 
 	encryptionCommand := fmt.Sprintf("age -r %s", strings.Join(BackupKeys, " -r "))
 	pipeCmd := fmt.Sprintf("gzip -c %s | %s > %s", bsonPath, encryptionCommand, encPath)
-	if _, err := runCommand(pipeCmd, 30, false); err != nil {
+	if _, err := runCommand("set -o pipefail; "+pipeCmd, 30, true); err != nil {
 		return fmt.Errorf("encrypt/gzip oplog: %w", err)
 	}
 

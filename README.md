@@ -16,7 +16,7 @@ The tool checks replica-set health before any backup; if a member is down, it re
 ## How does the chain work?
 
 1. A **full** writes two objects to S3:
-   - `<S3_FOLDER>/<dbname>/full/<utc>.gz.age` — encrypted archive (`mongodump --archive --gzip --oplog`)
+   - `<S3_FOLDER>/<dbname>/full/<utc>.gz.age` — encrypted data-only archive (`mongodump --archive --gzip`; the dump's starting oplog ts is recorded in the sidecar manifest so the following incrementals replay anything written during the dump)
    - `<S3_FOLDER>/<dbname>/full/<utc>.manifest.json` — sidecar JSON recording `oplog_start_ts`, sha256, size. Written **after** the archive uploads, so a half-finished full is invisible to thaw.
 
 2. An **incremental** dumps `local.oplog.rs` filtered to entries newer than the last known `to_ts`, encrypts, and writes one object:

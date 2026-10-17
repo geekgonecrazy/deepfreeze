@@ -204,11 +204,12 @@ func restoreFull(tmpDir, keyPath, targetURL string, m Manifest) error {
 	if err != nil {
 		return fmt.Errorf("presigned download URL: %w", err)
 	}
-	// Modern Database Tools reject --oplogReplay combined with any namespace
-	// include, and the archive already contains only this database's dump, so
-	// the restore maps the archive namespaces as-is.
+	// No --oplogReplay: the full archive contains data only (modern
+	// Database Tools restrict --oplog to whole-instance dumps). Recovery of
+	// the dump window happens when the incrementals replay from the full's
+	// recorded oplog_start_ts.
 	cmd := fmt.Sprintf(
-		"set -o pipefail; curl -sfL %q | age -d -i %s | mongorestore --uri=%q --archive --gzip --oplogReplay",
+		"set -o pipefail; curl -sfL %q | age -d -i %s | mongorestore --uri=%q --archive --gzip",
 		url, shellQuote(keyPath), thawTargetURI(targetURL, m.Database),
 	)
 	if _, err := runCommand(cmd, 60, true); err != nil {
