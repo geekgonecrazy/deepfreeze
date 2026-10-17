@@ -199,15 +199,28 @@ func triggerWebhook(url string, payload interface{}) {
 func sendRCWebhookTextMessage(text string) error {
 	log.Println(text)
 
-	if WebhookURL != "" {
-		var message = &rc_models.PostMessage{}
-
-		message.Text = text
-
-		triggerWebhook(WebhookURL, message)
+	if WebhookURL == "" {
+		return nil
 	}
 
+	// RC_WEBHOOK_FAIL_ONLY silences the "Starting/completed/Finished" chatter
+	// for high-frequency jobs like hourly incrementals while keeping every
+	// failure and BROKEN_CHAIN message loud.
+	if WebhookFailuresOnly && !reportsFailure(text) {
+		return nil
+	}
+
+	var message = &rc_models.PostMessage{}
+
+	message.Text = text
+
+	triggerWebhook(WebhookURL, message)
+
 	return nil
+}
+
+func reportsFailure(text string) bool {
+	return strings.Contains(text, "BROKEN_CHAIN") || strings.Contains(strings.ToLower(text), "failed")
 }
 
 func getMongoClient(_ context.Context, uri string) (*mongo.Client, error) {
