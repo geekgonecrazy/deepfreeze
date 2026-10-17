@@ -12,7 +12,7 @@ COPY . .
 
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o app .
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 RUN apk add --no-cache ca-certificates libc6-compat curl bash mongodb-tools age
 

@@ -28,7 +28,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends age
           curl -fsSL -o /tmp/mongodb-database-tools.deb \
-            "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.12.0.deb"
+            "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2404-x86_64-100.14.1.deb"
           sudo dpkg -i /tmp/mongodb-database-tools.deb
           mongodump --version
           age --version
