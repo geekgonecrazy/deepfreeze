@@ -107,9 +107,11 @@ func bytesToMegaBytes(b int64) float64 {
 // connection string. Used where a command-line tool call passes --db along
 // with the URI: modern Database Tools error out ("Cannot specify different
 // database in connection URI and command-line option") if the URI also names
-// a database. Authentication defaults to the database in the URI path, so the
-// stripped database is re-added as an explicit authSource unless one is
-// already present.
+// a database. For credentialed URIs the stripped database is re-added as an
+// explicit authSource unless one is present, since authentication defaults
+// to the database in the URI path. authSource on a credential-less URI makes
+// the tools start an (unneeded, failing) auth handshake, so it is skipped
+// there.
 func uriWithoutDatabase(uri string) string {
 	schemeEnd := strings.Index(uri, "://")
 	if schemeEnd < 0 {
@@ -130,17 +132,22 @@ func uriWithoutDatabase(uri string) string {
 		return uri
 	}
 	out := uri[:schemeEnd+3+slash+1] // keep the '/' — the tools' URI parser requires a path separator before any query
-	switch {
-	case strings.Contains(query, "authSource="):
-		if query != "" {
-			out += "?" + query
-		}
-	case query == "":
-		out += "?authSource=" + db
-	default:
-		out += "?" + query + "&authSource=" + db
+	queryPart := ""
+	if query != "" {
+		queryPart = "?" + query
 	}
-	return out
+	// Point authentication at the database that was in the URI path (its
+	// default) — but only when the URI actually carries credentials;
+	// authSource without credentials just triggers a failing auth handshake.
+	creds := strings.Contains(rest[:slash], "@")
+	if creds && !strings.Contains(query, "authSource=") {
+		sepStr := "&"
+		if query == "" {
+			sepStr = "?"
+		}
+		queryPart += sepStr + "authSource=" + db
+	}
+	return out + queryPart
 }
 
 func runCommand(command string, timeout int, bash bool) (string, error) {
