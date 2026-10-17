@@ -99,9 +99,11 @@ For Kubernetes, run two CronJobs sharing one image:
 `deepfreeze thaw` is the recommended path. If you want to drive it by hand:
 
 ```bash
-# Decrypt the full archive and restore it
+# Decrypt the full archive and restore it. Modern Database Tools do not
+# allow --oplogReplay together with --nsInclude; the archive contains only
+# the backed-up database, so its namespaces are restored as-is.
 curl -sfL "<presigned-get-url>" | age -d -i keyFile | \
-  mongorestore --uri='<target>' --archive --gzip --oplogReplay --nsInclude='product1.*'
+  mongorestore --uri='<target>' --archive --gzip --oplogReplay
 
 # For each incremental, in ascending order of from_ts:
 curl -sfL "<presigned-get-url>" | age -d -i keyFile | gunzip > oplog.bson

@@ -204,10 +204,12 @@ func restoreFull(tmpDir, keyPath, targetURL string, m Manifest) error {
 	if err != nil {
 		return fmt.Errorf("presigned download URL: %w", err)
 	}
-	nsArgs := nsIncludeArgs([]string{m.Database})
+	// Modern Database Tools reject --oplogReplay combined with any namespace
+	// include, and the archive already contains only this database's dump, so
+	// the restore maps the archive namespaces as-is.
 	cmd := fmt.Sprintf(
-		"set -o pipefail; curl -sfL %q | age -d -i %s | mongorestore --uri=%q --archive --gzip --oplogReplay %s",
-		url, shellQuote(keyPath), targetURL, nsArgs,
+		"set -o pipefail; curl -sfL %q | age -d -i %s | mongorestore --uri=%q --archive --gzip --oplogReplay",
+		url, shellQuote(keyPath), thawTargetURI(targetURL, m.Database),
 	)
 	if _, err := runCommand(cmd, 60, true); err != nil {
 		return err
@@ -238,14 +240,16 @@ func restoreIncremental(tmpDir, keyPath, targetURL, archiveKey string, databases
 		return fmt.Errorf("decrypt incremental: %w", err)
 	}
 
-	nsArgs := nsIncludeArgs(databases)
 	limitArg := ""
 	if oplogLimit != nil {
 		limitArg = fmt.Sprintf("--oplogLimit=%d:%d", oplogLimit.T, oplogLimit.I)
 	}
+	// No namespace include here either: modern Database Tools refuse
+	// --oplogReplay with includes; the empty dump dir just makes the tool
+	// replay the oplog file only.
 	restoreCmd := fmt.Sprintf(
-		"mongorestore --uri=%q --oplogReplay --oplogFile=%s %s %s %s",
-		targetURL, shellQuote(bsonPath), limitArg, nsArgs, shellQuote(emptyDir),
+		"mongorestore --uri=%q --oplogReplay --oplogFile=%s %s %s",
+		thawTargetURI(targetURL, databases[0]), shellQuote(bsonPath), limitArg, shellQuote(emptyDir),
 	)
 	if _, err := runCommand(restoreCmd, 60, false); err != nil {
 		return fmt.Errorf("mongorestore: %w", err)
@@ -253,12 +257,13 @@ func restoreIncremental(tmpDir, keyPath, targetURL, archiveKey string, databases
 	return nil
 }
 
-func nsIncludeArgs(databases []string) string {
-	parts := make([]string, 0, len(databases))
-	for _, db := range databases {
-		parts = append(parts, fmt.Sprintf("--nsInclude=%q", db+".*"))
-	}
-	return strings.Join(parts, " ")
+// thawTargetURI adapts a thaw target connection string for Database Tools:
+// the {DatabaseName} placeholder resolves to the database being restored
+// (so its implied authSource stays correct for app-database credentials and
+// no literal "{DatabaseName}" is ever sent to a tool), and then the database
+// itself is stripped because the restore maps archive namespaces directly.
+func thawTargetURI(targetURL, database string) string {
+	return uriWithoutDatabase(strings.Replace(targetURL, "{DatabaseName}", database, -1))
 }
 
 func shellQuote(s string) string {
