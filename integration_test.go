@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -225,9 +226,44 @@ func findManifestKey(t *testing.T, dbName string) string {
 
 func startSeaweedFS(ctx context.Context, t *testing.T) string {
 	t.Helper()
+
+	// Newer SeaweedFS releases reject signed S3 requests unless S3
+	// authentication identities are configured ("Signed request requires
+	// setting up SeaweedFS S3 authentication"). Mount an identity matching
+	// the test access/secret keys so the production code paths used below
+	// (minio-go signed requests and presigned curl uploads) authenticate.
+	s3Config, err := os.CreateTemp("", "seaweedfs-s3-*.json")
+	if err != nil {
+		t.Fatalf("create seaweedfs s3 config: %v", err)
+	}
+	if _, err := s3Config.WriteString(`{
+  "identities": [
+    {
+      "name": "deepfreeze-test",
+      "credentials": [
+        { "accessKey": "testkey", "secretKey": "testsecret" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}`); err != nil {
+		t.Fatalf("write seaweedfs s3 config: %v", err)
+	}
+	if err := s3Config.Close(); err != nil {
+		t.Fatalf("close seaweedfs s3 config: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Remove(s3Config.Name()) })
+
 	req := testcontainers.ContainerRequest{
-		Image:        "chrislusf/seaweedfs:latest",
-		Cmd:          []string{"server", "-s3"},
+		// Pinned for reproducibility; ":latest" broke silently once when
+		// SeaweedFS changed its S3 auth behavior.
+		Image: "chrislusf/seaweedfs:4.48",
+		Files: []testcontainers.ContainerFile{{
+			HostFilePath:      s3Config.Name(),
+			ContainerFilePath: "/etc/seaweedfs/s3.json",
+			FileMode:          0o644,
+		}},
+		Cmd:          []string{"server", "-s3", "-s3.config=/etc/seaweedfs/s3.json"},
 		ExposedPorts: []string{"8333/tcp"},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("8333/tcp"),
