@@ -20,6 +20,12 @@ var (
 	S3AccessKey   string
 	S3Region      string
 	S3Folder      string = "backups"
+
+	// WebhookFailuresOnly gates sendRCWebhookTextMessage: when true only
+	// failure and BROKEN_CHAIN messages are posted to RC_WEBHOOK. Set via
+	// RC_WEBHOOK_FAIL_ONLY=true for high-frequency jobs like hourly
+	// incrementals whose success chatter would drown out real alerts.
+	WebhookFailuresOnly bool
 )
 
 func main() {
@@ -85,6 +91,9 @@ func loadCommonConfig() {
 	}
 
 	WebhookURL = os.Getenv("RC_WEBHOOK")
+
+	v := strings.EqualFold(os.Getenv("RC_WEBHOOK_FAIL_ONLY"), "true") || os.Getenv("RC_WEBHOOK_FAIL_ONLY") == "1"
+	WebhookFailuresOnly = v
 }
 
 func loadFreezeConfig() {

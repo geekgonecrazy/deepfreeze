@@ -71,6 +71,7 @@ For Kubernetes, run two CronJobs sharing one image:
 | `S3_REGION` | Region. | `us-west-000` | yes |
 | `S3_FOLDER` | Prefix in the bucket. | `backups` | no (default `backups`) |
 | `RC_WEBHOOK` | Rocket.Chat incoming-webhook URL for status messages. | `https://your-rc.com/hooks/{secret}` | no |
+| `RC_WEBHOOK_FAIL_ONLY` | Post only failure and `BROKEN_CHAIN` messages; suppresses the per-run "Starting/completed/Finished" chatter. Useful for hourly incrementals. | `true` | no (default off) |
 
 ### Environment variables (thaw)
 
