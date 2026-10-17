@@ -1,7 +1,7 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: backup-job
+  name: backup-full
   namespace: default
 spec:
   schedule: "34 0 * * *"
@@ -14,8 +14,9 @@ spec:
       template:
         spec:
           containers:
-          - name: backup-job
+          - name: backup-full
             image: geekgonecrazy/deepfreeze
+            command: ["/root/app", "freeze", "full"]
             env:
             - name: RC_WEBHOOK
               value: https://{RC_WEBHOOK value}
