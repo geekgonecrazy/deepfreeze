@@ -11,17 +11,17 @@ func TestUriWithoutDatabase(t *testing.T) {
 		{
 			name: "uri with database and query gets authSource added",
 			in:   "mongodb://user:pw@mongo-1,mongo-2:27017/rocket?replicaSet=rs01",
-			want: "mongodb://user:pw@mongo-1,mongo-2:27017?replicaSet=rs01&authSource=rocket",
+			want: "mongodb://user:pw@mongo-1,mongo-2:27017/?replicaSet=rs01&authSource=rocket",
 		},
 		{
 			name: "existing authSource is preserved",
 			in:   "mongodb://user:pw@mongo-1:27017/appdata?replicaSet=rs01&authSource=admin",
-			want: "mongodb://user:pw@mongo-1:27017?replicaSet=rs01&authSource=admin",
+			want: "mongodb://user:pw@mongo-1:27017/?replicaSet=rs01&authSource=admin",
 		},
 		{
 			name: "database without query",
 			in:   "mongodb://mongo-1:27017/appdata",
-			want: "mongodb://mongo-1:27017?authSource=appdata",
+			want: "mongodb://mongo-1:27017/?authSource=appdata",
 		},
 		{
 			name: "already database-less URI is untouched",
@@ -41,12 +41,12 @@ func TestUriWithoutDatabase(t *testing.T) {
 		{
 			name: "srv scheme works",
 			in:   "mongodb+srv://cluster.example.com/appdata",
-			want: "mongodb+srv://cluster.example.com?authSource=appdata",
+			want: "mongodb+srv://cluster.example.com/?authSource=appdata",
 		},
 		{
 			name: "url-encoded slash in password does not confuse parsing",
 			in:   "mongodb://user:p%2Fw@mongo-1:27017/appdata",
-			want: "mongodb://user:p%2Fw@mongo-1:27017?authSource=appdata",
+			want: "mongodb://user:p%2Fw@mongo-1:27017/?authSource=appdata",
 		},
 	}
 	for _, tc := range cases {

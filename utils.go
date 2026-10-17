@@ -129,7 +129,7 @@ func uriWithoutDatabase(uri string) string {
 	if db == "" {
 		return uri
 	}
-	out := uri[:schemeEnd+3+slash]
+	out := uri[:schemeEnd+3+slash+1] // keep the '/' — the tools' URI parser requires a path separator before any query
 	switch {
 	case strings.Contains(query, "authSource="):
 		if query != "" {
